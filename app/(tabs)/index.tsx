@@ -10,14 +10,20 @@ import {
   visibleFeed,
   type Announcement,
 } from "../../lib/announcements";
+import { isStringArray, valueCodec } from "../../lib/persist";
+import { usePersistentState } from "../../lib/usePersistentState";
 
 const CATEGORIES = categories(SAMPLE_ANNOUNCEMENTS);
+const idsCodec = valueCodec(isStringArray);
+const boolCodec = valueCodec((v: unknown): v is boolean => typeof v === "boolean");
 const PRIORITY_COLOR = { urgent: "#B00020", normal: "#2A5A8C", info: "#5F6B7A" } as const;
 
 export default function AnnouncementsScreen() {
-  const [read, setRead] = useState<Set<string>>(new Set());
+  const [readIds, setReadIds] = usePersistentState<string[]>("announcements.read.v1", [], idsCodec);
+  const read = useMemo(() => new Set(readIds), [readIds]);
+  const setRead = (next: Set<string>) => setReadIds([...next]);
   const [category, setCategory] = useState<string | null>(null);
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [unreadOnly, setUnreadOnly] = usePersistentState("announcements.unreadOnly.v1", false, boolCodec);
   const [open, setOpen] = useState<string | null>(null);
   const now = useMemo(() => new Date(), []);
 
@@ -43,7 +49,10 @@ export default function AnnouncementsScreen() {
             <Pressable
               onPress={() => setRead(markAllRead(read, SAMPLE_ANNOUNCEMENTS))}
               accessibilityRole="button"
+              accessibilityLabel="Mark all announcements as read"
+              accessibilityState={{ disabled: unread === 0 }}
               disabled={unread === 0}
+
             >
               <Text style={[styles.link, unread === 0 && styles.disabled]}>Mark all read</Text>
             </Pressable>
