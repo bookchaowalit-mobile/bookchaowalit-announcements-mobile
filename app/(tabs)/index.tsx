@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
   categories,
+  localDateLabel,
   markAllRead,
   markRead,
   SAMPLE_ANNOUNCEMENTS,
@@ -86,7 +87,7 @@ export default function AnnouncementsScreen() {
               {!isRead && <View style={styles.dot} />}
             </View>
             <Text style={styles.meta}>
-              {item.category} · {item.priority} · {item.publishedAt.slice(0, 10)}
+              {item.category} · {item.priority} · {localDateLabel(item.publishedAt)}
             </Text>
             {expanded && <Text style={styles.body}>{item.body}</Text>}
           </Pressable>

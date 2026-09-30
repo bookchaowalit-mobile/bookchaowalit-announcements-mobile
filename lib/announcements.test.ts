@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   categories,
   isActive,
+  localDateLabel,
   markAllRead,
   markRead,
   SAMPLE_ANNOUNCEMENTS,
@@ -49,5 +50,25 @@ describe("read state", () => {
   });
   it("lists categories", () => {
     expect(categories(SAMPLE_ANNOUNCEMENTS)).toEqual(["Community", "Operations", "Product", "Security", "Support"]);
+  });
+});
+
+describe("pass 3 edge cases", () => {
+  it("shows the local calendar date, not the UTC one", () => {
+    const prev = process.env.TZ;
+    process.env.TZ = "Asia/Bangkok";
+    try {
+      expect(localDateLabel("2025-06-20T20:00:00Z")).toBe("2025-06-21");
+      expect(localDateLabel("2025-06-20T16:59:59Z")).toBe("2025-06-20");
+      expect(localDateLabel("garbage")).toBe("garbage");
+    } finally {
+      process.env.TZ = prev;
+    }
+  });
+  it("orders by instant even when offsets differ", () => {
+    const base = { ...SAMPLE_ANNOUNCEMENTS[1], pinned: false, priority: "normal" as const };
+    const a = { ...base, id: "a", publishedAt: "2025-06-02T01:00:00+07:00" }; // 2025-06-01T18:00Z
+    const b = { ...base, id: "b", publishedAt: "2025-06-01T20:00:00Z" };
+    expect(sortAnnouncements([a, b]).map((x) => x.id)).toEqual(["b", "a"]);
   });
 });

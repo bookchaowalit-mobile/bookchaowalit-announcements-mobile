@@ -48,3 +48,11 @@ Score: 7/10 (was 6/10) — read state now survives restarts; still sample data a
 - Accessibility: "Mark all read" has a label and disabled state; profile links get link roles.
 - Advisories: `overrides.postcss ^8.5.28` clears the high-severity PostCSS advisory in Expo metro-config (minor bump). Remaining `image-size` (metro, bundler-only), `uuid` (via `xcode`) and `decode-uri-component` (via `query-string@7`) need an Expo SDK major upgrade; deliberately not auto-fixed.
 - Verified: typecheck, lint, 16 vitest tests, Android `expo export` bundle.
+
+## Done in this pass (pass 3)
+
+Score: 7.5/10 (was 7/10) — edge-case hunt in `lib/announcements.ts`.
+
+- Bug: cards showed `publishedAt.slice(0, 10)`, i.e. the UTC date — an announcement published 20:00Z appeared a day early in Bangkok. New `localDateLabel` formats the device-local calendar date.
+- Bug: newest-first ordering compared ISO strings, so timestamps with different offsets (or garbage) mis-sorted; ordering now uses the parsed instant.
+- Verified: typecheck, lint, 18 vitest tests (TZ-pinned regression test), Android `expo export`.

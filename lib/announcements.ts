@@ -16,13 +16,31 @@ export type Announcement = {
 
 const PRIORITY_RANK: Record<Priority, number> = { urgent: 0, normal: 1, info: 2 };
 
+/** Milliseconds since epoch; unparseable timestamps sort as oldest. */
+function timeMs(iso: string): number {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? -Infinity : ms;
+}
+
+/**
+ * Calendar date of an instant in the device's time zone (YYYY-MM-DD).
+ * Slicing the ISO string would show the UTC date, which is a day off for
+ * e.g. 20:00Z in Bangkok.
+ */
+export function localDateLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 /** Pinned first, then by priority, then newest first. Does not mutate the input. */
 export function sortAnnouncements(items: Announcement[]): Announcement[] {
   return [...items].sort(
     (a, b) =>
       Number(b.pinned) - Number(a.pinned) ||
       PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
-      b.publishedAt.localeCompare(a.publishedAt),
+      timeMs(b.publishedAt) - timeMs(a.publishedAt),
   );
 }
 
