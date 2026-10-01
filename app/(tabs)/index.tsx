@@ -1,125 +1,132 @@
-import { StyleSheet, Text, View, ScrollView, Pressable } from "react-native";
+import { useMemo, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Link } from "expo-router";
+import {
+  categories,
+  localDateLabel,
+  markAllRead,
+  markRead,
+  SAMPLE_ANNOUNCEMENTS,
+  unreadCount,
+  visibleFeed,
+  type Announcement,
+} from "../../lib/announcements";
+import { isStringArray, valueCodec } from "../../lib/persist";
+import { usePersistentState } from "../../lib/usePersistentState";
 
-export default function HomeScreen() {
+const CATEGORIES = categories(SAMPLE_ANNOUNCEMENTS);
+const idsCodec = valueCodec(isStringArray);
+const boolCodec = valueCodec((v: unknown): v is boolean => typeof v === "boolean");
+const PRIORITY_COLOR = { urgent: "#B00020", normal: "#2A5A8C", info: "#5F6B7A" } as const;
+
+export default function AnnouncementsScreen() {
+  const [readIds, setReadIds] = usePersistentState<string[]>("announcements.read.v1", [], idsCodec);
+  const read = useMemo(() => new Set(readIds), [readIds]);
+  const setRead = (next: Set<string>) => setReadIds([...next]);
+  const [category, setCategory] = useState<string | null>(null);
+  const [unreadOnly, setUnreadOnly] = usePersistentState("announcements.unreadOnly.v1", false, boolCodec);
+  const [open, setOpen] = useState<string | null>(null);
+  const now = useMemo(() => new Date(), []);
+
+  const feed = visibleFeed(SAMPLE_ANNOUNCEMENTS, now, { category, unreadOnly, read });
+  const unread = unreadCount(SAMPLE_ANNOUNCEMENTS, read, now);
+
+  const toggle = (a: Announcement) => {
+    setOpen(open === a.id ? null : a.id);
+    setRead(markRead(read, a.id));
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Announcements</Text>
-        <Text style={styles.subtitle}>Announcements — Mobile app (expo)</Text>
-      </View>
+    <FlatList
+      style={styles.container}
+      data={feed}
+      keyExtractor={(a) => a.id}
+      ListHeaderComponent={
+        <View style={styles.filters}>
+          <View style={styles.row}>
+            <Text style={styles.unread} accessibilityLiveRegion="polite">
+              {unread} unread
+            </Text>
+            <Pressable
+              onPress={() => setRead(markAllRead(read, SAMPLE_ANNOUNCEMENTS))}
+              accessibilityRole="button"
+              accessibilityLabel="Mark all announcements as read"
+              accessibilityState={{ disabled: unread === 0 }}
+              disabled={unread === 0}
 
-      <View style={styles.cardGrid}>
-        <FeatureCard
-          icon="rocket"
-          title="Getting Started"
-          description="Welcome to the mobile version. Start building your experience."
-        />
-        <FeatureCard
-          icon="code"
-          title="Tech Stack"
-          description="Built with Expo, React Native, and TypeScript."
-        />
-        <FeatureCard
-          icon="phone-portrait"
-          title="Cross-Platform"
-          description="Runs on iOS, Android, and Web from a single codebase."
-        />
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Part of Chaowalit Greepoke's 101 Portfolio Projects
-        </Text>
-        <Link href="https://bookchaowalit.com" asChild>
-          <Pressable>
-            <Text style={styles.link}>bookchaowalit.com</Text>
+            >
+              <Text style={[styles.link, unread === 0 && styles.disabled]}>Mark all read</Text>
+            </Pressable>
+          </View>
+          <View style={styles.chips}>
+            <Chip label="All" active={category === null} onPress={() => setCategory(null)} />
+            {CATEGORIES.map((c) => (
+              <Chip key={c} label={c} active={category === c} onPress={() => setCategory(category === c ? null : c)} />
+            ))}
+            <Chip label="Unread only" active={unreadOnly} onPress={() => setUnreadOnly(!unreadOnly)} />
+          </View>
+        </View>
+      }
+      ListEmptyComponent={<Text style={styles.empty}>Nothing to show.</Text>}
+      renderItem={({ item }) => {
+        const isRead = read.has(item.id);
+        const expanded = open === item.id;
+        return (
+          <Pressable
+            style={[styles.card, { borderLeftColor: PRIORITY_COLOR[item.priority] }]}
+            onPress={() => toggle(item)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={`${item.pinned ? "Pinned. " : ""}${item.priority} ${item.title}${isRead ? "" : ", unread"}`}
+          >
+            <View style={styles.row}>
+              <Text style={[styles.cardTitle, !isRead && styles.bold]} numberOfLines={expanded ? undefined : 1}>
+                {item.title}
+              </Text>
+              {item.pinned && <Ionicons name="pin" size={16} color="#8A5A00" />}
+              {!isRead && <View style={styles.dot} />}
+            </View>
+            <Text style={styles.meta}>
+              {item.category} · {item.priority} · {localDateLabel(item.publishedAt)}
+            </Text>
+            {expanded && <Text style={styles.body}>{item.body}</Text>}
           </Pressable>
-        </Link>
-      </View>
-    </ScrollView>
+        );
+      }}
+    />
   );
 }
 
-function FeatureCard({
-  icon,
-  title,
-  description,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  description: string;
-}) {
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <View style={styles.card}>
-      <Ionicons name={icon} size={28} color="#4A90D9" />
-      <Text style={styles.cardTitle}>{title}</Text>
-      <Text style={styles.cardDescription}>{description}</Text>
-    </View>
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, active && styles.chipActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  header: {
-    backgroundColor: "#4A90D9",
-    padding: 24,
-    paddingTop: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 20,
-  },
-  cardGrid: {
-    padding: 16,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    alignItems: "center",
-    gap: 8,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  footer: {
-    padding: 24,
-    alignItems: "center",
-    gap: 8,
-  },
-  footerText: {
-    fontSize: 12,
-    color: "#999",
-  },
-  link: {
-    fontSize: 14,
-    color: "#4A90D9",
-    fontWeight: "500",
-  },
+  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  filters: { padding: 16, gap: 10 },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  unread: { fontSize: 16, fontWeight: "600", color: "#333" },
+  link: { color: "#4A90D9", fontWeight: "600" },
+  disabled: { color: "#aaa" },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: "#E3ECF7" },
+  chipActive: { backgroundColor: "#4A90D9" },
+  chipText: { color: "#2A5A8C", fontWeight: "500" },
+  chipTextActive: { color: "#fff" },
+  empty: { textAlign: "center", color: "#777", marginTop: 32 },
+  card: { backgroundColor: "#fff", borderRadius: 10, borderLeftWidth: 5, padding: 14, marginHorizontal: 16, marginBottom: 10, gap: 4, elevation: 1 },
+  cardTitle: { flex: 1, fontSize: 16, color: "#333" },
+  bold: { fontWeight: "700" },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#4A90D9" },
+  meta: { fontSize: 12, color: "#777", textTransform: "capitalize" },
+  body: { fontSize: 14, color: "#444", lineHeight: 20, marginTop: 4 },
 });
